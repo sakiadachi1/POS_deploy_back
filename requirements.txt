@@ -3,7 +3,6 @@ fastapi
 uvicorn
 mysql-connector-python
 
-
 # データベース操作
 sqlalchemy==1.4.49  # 2.x は databases と競合
 alembic==1.12.1  # マイグレーション
@@ -25,4 +24,5 @@ pyjwt==2.8.0  # JWT 認証
 # CORS 設定（必要なら）
 fastapi[all]
 
+# MySQL ドライバ（pymysql）
 pymysql
