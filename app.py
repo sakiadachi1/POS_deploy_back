@@ -35,7 +35,7 @@ class PurchaseRequest(BaseModel):
     emp_cd: str
     store_cd: Optional[str] = "30"  # 明示的にデフォルト値を設定
     pos_no: Optional[str] = "90"
-    cart: List[CartItem] = []  # カートのリスト
+    items: List[CartItem] = []  # カートのリスト
 
 # # DB セッションの取得
 def get_db():
