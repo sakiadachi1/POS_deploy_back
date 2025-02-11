@@ -5,6 +5,13 @@ import mysql.connector
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from urllib.parse import quote
+import psutil
+
+
+# SSL証明書の取得
+ssl_cert = os.getenv("SSL_CA_CERT")
+if not ssl_cert:
+    raise ValueError("❌ SSL_CA_CERT が設定されていません！")
 
 # 環境変数の取得
 db_user = os.getenv("MYSQL_USER")
@@ -27,14 +34,11 @@ if missing_vars:
 # パスワードを URL エンコード（ `@` → `%40` ）
 db_password_encoded = quote(db_password)
 
-# SSL証明書の取得
-SSL_CA_CERT = os.getenv("SSL_CA_CERT")
-if not SSL_CA_CERT:
-    raise ValueError("❌ SSL_CA_CERT が設定されていません！")
+
 
 # SSL証明書の一時ファイル作成
 def create_ssl_cert_tempfile():
-    pem_content = SSL_CA_CERT.replace("\\n", "\n").replace("\\", "")
+    pem_content = ssl_cert.replace("\\n", "\n").replace("\\", "")
     temp_pem = tempfile.NamedTemporaryFile(delete=False, suffix=".pem", mode="w")
     temp_pem.write(pem_content)
     temp_pem.close()

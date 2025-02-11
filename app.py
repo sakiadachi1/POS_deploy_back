@@ -7,8 +7,9 @@ from models import Product
 from datetime import datetime
 from zoneinfo import ZoneInfo
 import pymysql
-import mysql.connector
 from fastapi.middleware.cors import CORSMiddleware
+import os
+import psutil
 
 app = FastAPI()
 
@@ -54,7 +55,6 @@ def get_product(code: str, db: Session = Depends(get_db)):
     return {"product": {"code": product.code, "name": product.name, "price": product.price}}
 
 
-# ✅ 購入処理
 @app.post("/purchase")
 def handle_purchase(request: PurchaseRequest,):
     if not request.cart:
@@ -71,7 +71,8 @@ def handle_purchase(request: PurchaseRequest,):
         total_price = sum(item.price * item.quantity for item in request.cart)
         cursor.execute(
             """
-            INSERT INTO transactions_adachi (DATETIME, EMP_CD, STORE_CD, POS_NO, TOTAL_AMT) VALUES (%s, %s, %s, %s, %s)
+            INSERT INTO transactions_adachi (DATETIME, EMP_CD, STORE_CD, POS_NO, TOTAL_AMT) 
+            VALUES (%s, %s, %s, %s, %s)
             """,
             (now, request.emp_cd, request.store_cd, request.pos_no, total_price)
         )
@@ -81,16 +82,15 @@ def handle_purchase(request: PurchaseRequest,):
         if trd_id is None:
             raise HTTPException(status_code=500, detail="取引IDの取得に失敗しました")
 
-        # 🔹 取引詳細の挿入
+        # 🔹 取引詳細の挿入をバッチ処理で行わず、少しずつ挿入
         for item in request.cart:
             cursor.execute("SELECT PRD_ID FROM m_product_adachi WHERE code = %s", (item.code,))
             product_data = cursor.fetchone()
             if not product_data:
                 raise HTTPException(status_code=400, detail=f"商品コード {item.code} が見つかりません")
             
-            prd_id = product_data[0] # ✅ `fetchone()` のデータアクセス修正
+            prd_id = product_data[0]  # ✅ `fetchone()` のデータアクセス修正
 
-            # ✅ `transaction_details_adachi` に QUANTITY はないので削除
             cursor.execute(
                 """
                 INSERT INTO transaction_details_adachi (TRD_ID, PRD_ID, PRD_CODE, PRD_NAME, PRD_PRICE) 
@@ -98,9 +98,12 @@ def handle_purchase(request: PurchaseRequest,):
                 """,
                 (trd_id, prd_id, item.code, item.name, item.price)
             )
+            # 途中でコミットすることで、メモリの消費を抑える
+            conn.commit()
 
+        # 最後にまとめてコミットする
         conn.commit()
-    
+
     except pymysql.MySQLError as e:
         conn.rollback()
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
@@ -114,3 +117,65 @@ def handle_purchase(request: PurchaseRequest,):
         conn.close()
 
     return {"trd_id": trd_id, "total_amt": total_price}
+
+
+# # ✅ 購入処理
+# @app.post("/purchase")
+# def handle_purchase(request: PurchaseRequest,):
+#     if not request.cart:
+#         raise HTTPException(status_code=400, detail="カートが空です")
+
+#     try:
+#         # conn = get_db_connection()
+#         # cursor = conn.cursor()
+
+#         # 🔹 日本時間の現在日時を取得
+#         now = datetime.now(ZoneInfo("Asia/Tokyo"))
+
+#         # 🔹 トランザクションテーブルへのデータ挿入（TRD_IDは AUTO_INCREMENT）
+#         total_price = sum(item.price * item.quantity for item in request.cart)
+#         cursor.execute(
+#             """
+#             INSERT INTO transactions_adachi (DATETIME, EMP_CD, STORE_CD, POS_NO, TOTAL_AMT) VALUES (%s, %s, %s, %s, %s)
+#             """,
+#             (now, request.emp_cd, request.store_cd, request.pos_no, total_price)
+#         )
+
+#         # 🔹 取引IDの取得
+#         trd_id = cursor.lastrowid
+#         if trd_id is None:
+#             raise HTTPException(status_code=500, detail="取引IDの取得に失敗しました")
+
+#         # 🔹 取引詳細の挿入
+#         for item in request.cart:
+#             cursor.execute("SELECT PRD_ID FROM m_product_adachi WHERE code = %s", (item.code,))
+#             product_data = cursor.fetchone()
+#             if not product_data:
+#                 raise HTTPException(status_code=400, detail=f"商品コード {item.code} が見つかりません")
+            
+#             prd_id = product_data[0] # ✅ `fetchone()` のデータアクセス修正
+
+#             # ✅ `transaction_details_adachi` に QUANTITY はないので削除
+#             cursor.execute(
+#                 """
+#                 INSERT INTO transaction_details_adachi (TRD_ID, PRD_ID, PRD_CODE, PRD_NAME, PRD_PRICE) 
+#                 VALUES (%s, %s, %s, %s, %s)
+#                 """,
+#                 (trd_id, prd_id, item.code, item.name, item.price)
+#             )
+
+#         conn.commit()
+    
+#     except pymysql.MySQLError as e:
+#         conn.rollback()
+#         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+    
+#     except Exception as e:
+#         conn.rollback()
+#         raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
+    
+#     finally:
+#         cursor.close()
+#         conn.close()
+
+#     return {"trd_id": trd_id, "total_amt": total_price}
