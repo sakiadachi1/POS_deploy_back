@@ -53,6 +53,7 @@ def get_db_connection():
         ssl_ca=ssl_ca_path
     )
 
+
 # 環境変数のチェック（デバッグ用）
 print(f"✅ MySQL USER: {db_user}")
 print(f"✅ MySQL HOST: {db_host}")

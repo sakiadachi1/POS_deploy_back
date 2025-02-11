@@ -10,16 +10,15 @@ import pymysql
 import mysql.connector
 from fastapi.middleware.cors import CORSMiddleware
 
-
 app = FastAPI()
 
 # CORS 設定
 origins = ["http://localhost:3000", "http://127.0.0.1:3000"]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["*"],# 開発時のみ "*" を使用、プロダクションでは特定のオリジンに制限する
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["*"], # POSTメソッドを含むすべてのメソッドを許可
     allow_headers=["*"],
 )
 
@@ -37,7 +36,7 @@ class PurchaseRequest(BaseModel):
     pos_no: Optional[str] = "90"
     cart: List[CartItem] = []  # カートのリスト
 
-# DB セッションの取得
+# # DB セッションの取得
 def get_db():
     db = SessionLocal()
     try:
@@ -45,18 +44,19 @@ def get_db():
     finally:
         db.close()
 
-# 商品情報取得エンドポイント
+
+# # 商品情報取得エンドポイント
 @app.get("/product/{code}")
 def get_product(code: str, db: Session = Depends(get_db)):
     product = db.query(Product).filter(Product.code == code).first()
     if not product:
         raise HTTPException(status_code=404, detail="商品が見つかりません")
-
     return {"product": {"code": product.code, "name": product.name, "price": product.price}}
+
 
 # ✅ 購入処理
 @app.post("/purchase")
-def handle_purchase(request: PurchaseRequest):
+def handle_purchase(request: PurchaseRequest,):
     if not request.cart:
         raise HTTPException(status_code=400, detail="カートが空です")
 
@@ -78,7 +78,7 @@ def handle_purchase(request: PurchaseRequest):
 
         # 🔹 取引IDの取得
         trd_id = cursor.lastrowid
-        if not trd_id:
+        if trd_id is None:
             raise HTTPException(status_code=500, detail="取引IDの取得に失敗しました")
 
         # 🔹 取引詳細の挿入
