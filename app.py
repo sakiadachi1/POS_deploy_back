@@ -57,7 +57,7 @@ def get_product(code: str, db: Session = Depends(get_db)):
 
 @app.post("/purchase")
 def handle_purchase(request: PurchaseRequest,):
-    if not request.cart:
+    if not request.items:
         raise HTTPException(status_code=400, detail="カートが空です")
 
     try:
@@ -68,7 +68,7 @@ def handle_purchase(request: PurchaseRequest,):
         now = datetime.now(ZoneInfo("Asia/Tokyo"))
 
         # 🔹 取引テーブルにデータを挿入（TRD_IDは AUTO_INCREMENT）
-        total_price = sum(item.price * item.quantity for item in request.cart)
+        total_price = sum(item.price * item.quantity for item in request.items)
         cursor.execute(
             """
             INSERT INTO transactions_adachi (DATETIME, EMP_CD, STORE_CD, POS_NO, TOTAL_AMT) 
@@ -82,8 +82,8 @@ def handle_purchase(request: PurchaseRequest,):
         if trd_id is None:
             raise HTTPException(status_code=500, detail="取引IDの取得に失敗しました")
 
-        # 🔹 取引詳細の挿入をバッチ処理で行わず、少しずつ挿入
-        for item in request.cart:
+        # 🔹 取引詳細の挿入をバッチ処理で行わず、少しずつ挿入（transaction_details_adachiにデータを挿入）
+        for item in request.items:
             cursor.execute("SELECT PRD_ID FROM m_product_adachi WHERE code = %s", (item.code,))
             product_data = cursor.fetchone()
             if not product_data:
@@ -122,7 +122,7 @@ def handle_purchase(request: PurchaseRequest,):
 # # ✅ 購入処理
 # @app.post("/purchase")
 # def handle_purchase(request: PurchaseRequest,):
-#     if not request.cart:
+#     if not request.items:
 #         raise HTTPException(status_code=400, detail="カートが空です")
 
 #     try:
@@ -133,7 +133,7 @@ def handle_purchase(request: PurchaseRequest,):
 #         now = datetime.now(ZoneInfo("Asia/Tokyo"))
 
 #         # 🔹 トランザクションテーブルへのデータ挿入（TRD_IDは AUTO_INCREMENT）
-#         total_price = sum(item.price * item.quantity for item in request.cart)
+#         total_price = sum(item.price * item.quantity for item in request.items)
 #         cursor.execute(
 #             """
 #             INSERT INTO transactions_adachi (DATETIME, EMP_CD, STORE_CD, POS_NO, TOTAL_AMT) VALUES (%s, %s, %s, %s, %s)
@@ -147,7 +147,7 @@ def handle_purchase(request: PurchaseRequest,):
 #             raise HTTPException(status_code=500, detail="取引IDの取得に失敗しました")
 
 #         # 🔹 取引詳細の挿入
-#         for item in request.cart:
+#         for item in request.items:
 #             cursor.execute("SELECT PRD_ID FROM m_product_adachi WHERE code = %s", (item.code,))
 #             product_data = cursor.fetchone()
 #             if not product_data:
