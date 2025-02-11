@@ -24,3 +24,5 @@ pyjwt==2.8.0  # JWT 認証
 
 # CORS 設定（必要なら）
 fastapi[all]
+
+pymysql

@@ -1,20 +1,28 @@
+
 import os
 import tempfile
 import mysql.connector
-import ssl
-from dotenv import load_dotenv
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from urllib.parse import quote
-
-# .env をロード
-load_dotenv(dotenv_path=".env", override=True)
 
 # 環境変数の取得
 db_user = os.getenv("MYSQL_USER")
 db_password = os.getenv("MYSQL_PASSWORD")
 db_host = os.getenv("MYSQL_HOST")
 db_name = os.getenv("MYSQL_DATABASE")
+
+# 必須環境変数のチェック
+missing_vars = [var for var, value in {
+    "MYSQL_USER": db_user,
+    "MYSQL_PASSWORD": db_password,
+    "MYSQL_HOST": db_host,
+    "MYSQL_DATABASE": db_name,
+    "SSL_CA_CERT": ssl_cert
+}.items() if not value]
+
+if missing_vars:
+    raise ValueError(f"❌ 必須環境変数が設定されていません: {', '.join(missing_vars)}")
 
 # パスワードを URL エンコード（ `@` → `%40` ）
 db_password_encoded = quote(db_password)
@@ -34,11 +42,10 @@ def create_ssl_cert_tempfile():
 
 ssl_ca_path = create_ssl_cert_tempfile()
 
-# MySQL への接続
-engine = create_engine(
-    f"mysql+pymysql://{db_user}:{db_password_encoded}@{db_host}/{db_name}?ssl_ca={ssl_ca_path}",
-    pool_pre_ping=True
-)
+
+# SQLAlchemy エンジンの作成
+DATABASE_URL = f"mysql+pymysql://{db_user}:{db_password_encoded}@{db_host}/{db_name}?ssl_ca={ssl_ca_path}"
+engine = create_engine(DATABASE_URL, pool_pre_ping=True)
 
 # セッションの作成
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
